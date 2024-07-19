@@ -246,18 +246,29 @@ elif data_to_display == "Ticket Categories":
 
             engine = create_engine(f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}')
 
-            # Connect to the database
+            # Ensure column names are lowercase with underscores
+            test.columns = [col.lower().replace(" ", "_") for col in test.columns]
+
             with engine.connect() as connection:
-                
+                # Create table creation query dynamically based on DataFrame column names and types
+                table_name = 'ticket_categories'
+                columns = ", ".join([f'"{col}" TEXT' for col in test.columns])
+                table_creation_query = f"""
+                CREATE TABLE IF NOT EXISTS {table_name} (
+                    {columns}
+                );
+                """
+                connection.execute(table_creation_query)
+
                 # Retrieve existing data from the database
-                existing_data = pd.read_sql_table('ticket_categories', con=connection)
+                existing_data = pd.read_sql_table(table_name, con=connection)
 
                 # Filter out rows from test DataFrame that already exist in the database
                 test_unique = test[~test.apply(tuple, axis=1).isin(existing_data.apply(tuple, axis=1))]
 
                 if not test_unique.empty:
                     # Insert data into the ticket_categories table
-                    test_unique.to_sql('ticket_categories', connection, if_exists='append', index=False, method='multi')
+                    test_unique.to_sql(table_name, connection, if_exists='append', index=False, method='multi')
                     st.success("Data was uploaded successfully!")
                 else:
                     st.warning("No new data to upload. All records are already in the database.")
